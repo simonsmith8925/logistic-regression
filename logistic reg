@@ -1,0 +1,32 @@
+library(dismo)
+library(dplyr)
+library(ggplot2)
+library(raster)
+library(biomod2)
+library(terra)
+library(tidyterra)
+library(ggtext)
+env_data = stack("f1.tif")####env data
+hadata = read.csv("hapresent2.csv")####present data
+head(hadata)
+hapresent_data = dplyr::select(hadata,lon,lat)###
+hapresent_env = raster::extract(env_data,hapresent_data)####extract
+hadata = cbind(hadata,hapresent_env)
+###logistic regression
+hadata = hadata[,-c(1:4)]
+halogistic_rege_model = glm(present~f1_3+f1_4+f1_5+f1_2+f1_1,
+                          family = binomial(link = "logit"),
+                          data = hadata)
+summary(halogistic_rege_model)
+###ROC_curve
+hapresent_data = filter(hadata,hadata$present == 1)
+haabsent_data = filter(hadata,hadata$present == 0)
+haevaluation = evaluate(hapresent_data,haabsent_data,halogistic_rege_model)
+plot(haevaluation,"ROC")
+hapredictions = predict(env_data,
+                      halogistic_rege_model,
+                      type = "response")
+plot(hapredictions,ext = extent(106.986,107.073,32.829,32.91))
+points(hapresent_data[,c("lon","lat")],cex = 0.8)
+plot(hapredictions>0.8,ext = extent(106.986,107.073,32.829,32.91))####hotplot
+writeRaster(hapredictions, "hahotFINAL6.tif", format = "GTiff", overwrite = TRUE)
